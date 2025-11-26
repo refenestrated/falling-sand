@@ -1,0 +1,5 @@
+*.log
+temp/
+/falling-sand.kdev4
+build/
+.kdev4/falling-sand.kdev4
