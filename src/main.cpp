@@ -123,7 +123,7 @@ int main(int argc, char **argv)
     SDL_Event e;
 
     const int targetFPS {60};
-    const int frameDelay {1000 / targetFPS};
+    const float frameDelay {1000 / targetFPS};
 
     bool running {true};
     while (running)

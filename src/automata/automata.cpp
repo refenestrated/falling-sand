@@ -5,30 +5,30 @@ CellularAutomata::CellularAutomata(int width, int height)
     this->width = width;
     this->height = height;
 
-    grid = new int*[width];
+    grid.resize(width);
+    newGrid.resize(width);
+
     for (int i = 0; i < width; i++)
     {
-        grid[i] = new int[height];
-        for (int j = 0; j < height; j++)
-        {
-            grid[i][j] = 0;
-        }
+        grid[i].resize(height, 0);
+        newGrid[i].resize(height, 0);
     }
 }
 
-CellularAutomata::~CellularAutomata()
+bool CellularAutomata::checkCell(int cellX, int cellY, int cellType)
 {
-    for (int i = 0; i < width; i++)
+    //ensure cell is valid
+    if (cellX < 0 || cellX >= width || cellY < 0 || cellY >= height)
     {
-        delete[] grid[i];
+        return false;
     }
-    delete[] grid;
-}
 
-//utility function
-int CellularAutomata::getCell(int cellX, int cellY)
-{
-    return grid[cellX][cellY];
+    //compare cell types
+    if (grid[cellX][cellY] == cellType)
+    {
+        return true;
+    }
+    return false;
 }
 
 unsigned char* CellularAutomata::getStateAsImage()
@@ -73,11 +73,21 @@ unsigned char* CellularAutomata::getStateAsImage()
 //automata rules are applied
 void CellularAutomata::update()
 {
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::uniform_int_distribution<std::mt19937::result_type> dist1(0, 1);
+
+    // i is cell x position and j is cell y position
     for (int i = 0; i < width; i++)
     {
         for (int j = 0; j < height; j++)
         {
-            int cellType = grid[i][j];
+            int cellType {grid[i][j]};
+            int up {j + 1};
+            int down {j - 1};
+            int left {i - 1};
+            int right {i + 1};
+
             switch (cellType)
             {
                 //cell is air
@@ -86,37 +96,63 @@ void CellularAutomata::update()
 
                 //cell is sand
                 case 1:
-                    if (j + 1 < height && grid[i][j - 1] == 0) {  // move down
-                        grid[i][j - 1] = 1;
-                        grid[i][j] = 0;
+                    if (checkCell(i, down, 0))
+                    {
+                        newGrid[i][down] = 1;
+                        newGrid[i][j] = 0;
                     }
-                    else if (i + 1 < width && j - 1 < height && grid[i + 1][j - 1] == 0) {  // move diagonal right
-                        grid[i + 1][j - 1] = 1;
-                        grid[i][j] = 0;
+                    else if (checkCell(right, down, 0))
+                    {
+                        newGrid[right][down] = 1;
+                        newGrid[i][j] = 0;
                     }
-                    else if (i - 1 >= 0 && j - 1 < height && grid[i - 1][j - 1] == 0) {  // move diagonal left
-                        grid[i - 1][j - 1] = 1;
-                        grid[i][j] = 0;
+                    else if (checkCell(left, down, 0))
+                    {
+                        newGrid[left][down] = 1;
+                        newGrid[i][j] = 0;
                     }
                     break;
 
+                //cell is water
                 case 2:
-                    if (j + 1 < height && grid[i][j - 1] == 0) {  // move down
-                        grid[i][j - 1] = 2;
-                        grid[i][j] = 0;
+                    if (checkCell(i, down, 0))
+                    {
+                        newGrid[i][down] = 2;
+                        newGrid[i][j] = 0;
                     }
-                    else if (i + 1 < width && grid[i + 1][j] == 0) {  // move diagonal right
-                        grid[i + 1][j] = 2;
-                        grid[i][j] = 0;
+                    else if (dist1(g) == 1)
+                    {
+                        if (checkCell(right, j, 0))
+                        {
+                            newGrid[right][j] = 2;
+                            newGrid[i][j] = 0;
+                        }
+                        else if (checkCell(left, j, 0))
+                        {
+                            newGrid[left][j] = 2;
+                            newGrid[i][j] = 0;
+                        }
                     }
-                    else if (i - 1 >= 0 && grid[i - 1][j] == 0) {  // move diagonal left
-                        grid[i - 1][j] = 2;
-                        grid[i][j] = 0;
+                    else
+                    {
+                        if (checkCell(left, j, 0))
+                        {
+                            newGrid[left][j] = 2;
+                            newGrid[i][j] = 0;
+                        }
+                        else if (checkCell(right, j, 0))
+                        {
+                            newGrid[right][j] = 2;
+                            newGrid[i][j] = 0;
+                        }
                     }
+
                     break;
             }
         }
     }
+
+    grid = newGrid;
 }
 
 //inputs take effect
@@ -140,7 +176,7 @@ void CellularAutomata::updateInputs(float mouseXin, float mouseYin, bool lmbDown
         {
             for (int j = 0; j < 10; j++)
             {
-                int x {(int)mouseX + 1};
+                int x {(int)mouseX + i};
                 int y {(int)mouseY + j};
                 if (x >= 0 && x < width && y >= 0 && y < height)
                 {
@@ -155,7 +191,7 @@ void CellularAutomata::updateInputs(float mouseXin, float mouseYin, bool lmbDown
         {
             for (int j = 0; j < 10; j++)
             {
-                int x {(int)mouseX + 1};
+                int x {(int)mouseX + i};
                 int y {(int)mouseY + j};
                 if (x >= 0 && x < width && y >= 0 && y < height)
                 {
