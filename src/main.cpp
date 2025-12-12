@@ -1,7 +1,6 @@
 #include <iostream>
 #include <SDL3/SDL.h>
-#include "glad/include/glad/glad.h"
-#include "automata/automata.h"
+#include <glad.h>
 #include "shader/Shader.h"
 
 int constexpr SCR_WIDTH {1920};
