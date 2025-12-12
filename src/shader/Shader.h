@@ -11,7 +11,8 @@
 class Shader
 {
 public:
-    unsigned int ID;
+    GLuint ID;
+
     Shader(const char* vertexPath, const char* fragmentPath)
     {
         std::string vertexCode, fragmentCode;
@@ -62,9 +63,49 @@ public:
         glDeleteShader(fragment);
     }
 
+    Shader(const char* computePath)
+    {
+        std::string computeCode;
+        std::ifstream cShaderFile;
+
+        cShaderFile.exceptions(std::ifstream::failbit);
+        try
+        {
+            cShaderFile.open(computePath);
+            std::stringstream cShaderStream;
+            cShaderStream << cShaderFile.rdbuf();
+            cShaderFile.close();
+            computeCode = cShaderStream.str();
+        }
+        catch(std::ifstream::failure& e)
+        {
+            std::cerr << "ERROR: Compute shader file failed to read: " << e.what() << std::endl;
+        }
+
+        const char* cShaderCode = computeCode.c_str();
+
+        unsigned int compute = glCreateShader(GL_COMPUTE_SHADER);
+        glShaderSource(compute, 1, &cShaderCode, nullptr);
+        glCompileShader(compute);
+        checkCompileError(compute, "COMPUTE");
+
+        ID = glCreateProgram();
+        glAttachShader(ID, compute);
+        glLinkProgram(ID);
+        checkCompileError(ID, "PROGRAM");
+
+        glDeleteShader(compute);
+    }
+
     void use()
     {
         glUseProgram(ID);
+    }
+
+    void dispatch(int x, int y, int z)
+    {
+        glDispatchCompute(x, y, z);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
     void setBool(const std::string &name, bool value)
@@ -79,27 +120,35 @@ public:
     {
         glUniform1f(glGetUniformLocation(ID, name.c_str()), value);
     }
+    void setImage2D(const std::string &name, GLuint textureID, GLenum access = GL_READ_WRITE)
+    {
+        GLint loc = glGetUniformLocation(ID, name.c_str());
+        glUniform1i(loc, 0);
+        glBindImageTexture(0, textureID, 0, GL_FALSE, 0, access, GL_RGBA8);
+    }
+
 private:
     void checkCompileError(unsigned int shader, std::string type)
     {
         int success;
         char infolog[1024];
+
         if (type == "PROGRAM")
         {
             glGetProgramiv(shader, GL_LINK_STATUS, &success);
             if (!success)
             {
-                glGetShaderInfoLog(shader, 1024, nullptr, infolog);
+                glGetProgramInfoLog(shader, 1024, nullptr, infolog);
                 std::cerr << "ERROR: Program linking of type: " << type << "\n" << infolog << std::endl;
             }
-            else
+        }
+        else
+        {
+            glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+            if (!success)
             {
-                glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-                if (!success)
-                {
-                    glGetShaderInfoLog(shader, 1024, nullptr, infolog);
-                    std::cerr << "ERROR: Shader compilation of type: " << type << "\n" << infolog << std::endl;
-                }
+                glGetShaderInfoLog(shader, 1024, nullptr, infolog);
+                std::cerr << "ERROR: Shader compilation of type: " << type << "\n" << infolog << std::endl;
             }
         }
     }
