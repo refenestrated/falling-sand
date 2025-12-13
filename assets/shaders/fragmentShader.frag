@@ -6,12 +6,20 @@ struct Cell
     int type;
     int justMoved;
     int density;
+    int inertia;
 };
 
 layout(std430, binding = 0) buffer GridBuffer
 {
     Cell grid[];
 };
+
+layout(std430, binding = 3) buffer movedBuffer
+{
+    int moved[];
+};
+
+uniform bool debug;
 
 uniform int gridWidth;
 uniform int gridHeight;
@@ -25,9 +33,6 @@ void main()
     vec2 uv = gl_FragCoord.xy / vec2(screenWidth, screenHeight);
     ivec2 gID = ivec2(uv * vec2(gridWidth, gridHeight));
 
-    //gID.x = int(float(gID.x) / float(gridWidth) * gridWidth);
-    //gID.y = int(float(gID.y) / float(gridHeight) * gridHeight);
-
     if (gID.x >= gridWidth || gID.y >= gridHeight)
     {
         discard;
@@ -37,15 +42,21 @@ void main()
 
     Cell currentCell = grid[IDx];
 
-    /*
-    if (currentCell.justMoved == 0)
+    //debug view which shows which cells have moved in the last frame
+    if (debug)
     {
-        FragColour = vec4(1.0, 0.0, 0.0, 1.0);
+        if (moved[IDx] == 1)
+        {
+            FragColour = vec4(1.0, 0.0, 0.0, 1.0);
+        }
+        else
+        {
+            FragColour = vec4(0.0);
+        }
     }
+    //default view
     else
     {
-        FragColour = vec4(0.0);
+        FragColour = vec4(currentCell.colour);
     }
-    */
-    FragColour = vec4(currentCell.colour);
 }

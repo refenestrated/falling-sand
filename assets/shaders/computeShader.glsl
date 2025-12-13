@@ -6,6 +6,7 @@ struct Cell
     int type;
     int justMoved;
     int density;
+    int inertia;
 };
 
 layout(std430, binding = 0) buffer GridBuffer
@@ -23,6 +24,11 @@ layout(std430, binding = 2) buffer claimBuffer
     int claim[];
 };
 
+layout(std430, binding = 3) buffer movedBuffer
+{
+    int moved[];
+};
+
 layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 uniform int pass;
@@ -38,9 +44,9 @@ uniform int mouseY;
 uniform bool leftMouseDown;
 uniform bool rightMouseDown;
 
-Cell Air = Cell(vec4(0.0, 0.0, 0.0, 0.0), 0, 0, 0);
-Cell Sand = Cell(vec4(1.0, 1.0, 0.0, 1.0), 1, 0, 10);
-Cell Water = Cell(vec4(0.0, 0.0, 1.0, 1.0), 2, 0, 5);
+Cell Air = Cell(vec4(0.0, 0.0, 0.0, 0.0), 0, 0, 0, 0);
+Cell Sand = Cell(vec4(1.0, 1.0, 0.0, 1.0), 1, 0, 10, 0);
+Cell Water = Cell(vec4(0.0, 0.0, 1.0, 1.0), 2, 0, 5, 0);
 
 uint hash(uint x)
 {
@@ -81,12 +87,13 @@ bool tryClaimAndMove(uint source, uint destination, Cell cell)
     if (result == expected)
     {
         nextGrid[destination] = cell;
-        nextGrid[destination].justMoved = 0;
+        nextGrid[destination].justMoved = 1;
 
         nextGrid[source] = destCell;
         nextGrid[source].justMoved = 0;
 
-        grid[source].justMoved = 1;
+        moved[source] = 1;
+        moved[destination] = 1;
         return true;
     }
     return false;
@@ -106,36 +113,43 @@ void main()
 
     //user painting
     ivec2 clampedMouse = ivec2(clamp(mouseX, 0, gridWidth - 1), clamp(mouseY, 0, gridHeight - 1));
-    uint mouseIDx = clampedMouse.y * gridWidth + clampedMouse.x;
 
     if (pass == 0)
     {
         if (IDx < uint((gridWidth * gridHeight)))
         {
             claim[IDx] = -1;
+            moved[IDx] = 0;
         }
     }
 
     //paint pass
     else if (pass == 1)
     {
+        int radius = 4;
+
         nextGrid[IDx] = currentCell;
         nextGrid[IDx].justMoved = 0;
 
-        if (gID.x == clampedMouse.x && gID.y == clampedMouse.y && currentCell.type == 0)
+        if (distance(vec2(gID), vec2(clampedMouse)) < float(radius))
         {
             if (leftMouseDown)
             {
-                nextGrid[mouseIDx] = Sand;
+                nextGrid[IDx] = Sand;
             }
             else if (rightMouseDown)
             {
-                nextGrid[mouseIDx] = Water;
+                nextGrid[IDx] = Water;
             }
         }
     }
 
     else if (currentCell.justMoved == 1)
+    {
+        return;
+    }
+
+    else if (pass >= 2 && moved[IDx] == 1)
     {
         return;
     }
@@ -166,7 +180,6 @@ void main()
             downRight = IDx - gridWidth + 1;
         }
 
-        //sand diagonal movement
         bool preferRight = ((hash(IDx) & 1u) == 0u);
         if (preferRight)
         {
@@ -187,8 +200,6 @@ void main()
     //horizontal movement pass
     else if (pass == 4 && currentCell.type == 2)
     {
-        bool preferRight = ((hash(IDx) & 1u) == 0u);
-
         uint left = IDx;
         uint right = IDx;
 
@@ -201,19 +212,36 @@ void main()
             right = IDx + 1;
         }
 
-        //water horizontal movement
-        if (preferRight)
+        if (currentCell.inertia == 1)
         {
             if (!tryClaimAndMove(IDx, right, currentCell))
             {
                 tryClaimAndMove(IDx, left, currentCell);
             }
         }
-        else
+        else if (currentCell.inertia == -1)
         {
             if (!tryClaimAndMove(IDx, left, currentCell))
             {
                 tryClaimAndMove(IDx, right, currentCell);
+            }
+        }
+        else
+        {
+            bool preferRight = ((hash(IDx + uint(pass) + uint(time * 997.0)) & 1u) == 0u);
+            if (preferRight)
+            {
+                if (!tryClaimAndMove(IDx, right, currentCell))
+                {
+                    tryClaimAndMove(IDx, left, currentCell);
+                }
+            }
+            else
+            {
+                if (!tryClaimAndMove(IDx, left, currentCell))
+                {
+                    tryClaimAndMove(IDx, right, currentCell);
+                }
             }
         }
     }

@@ -5,8 +5,8 @@
 
 int constexpr SCR_WIDTH {1920};
 int constexpr SCR_HEIGHT {1080};
-int constexpr GRID_WIDTH {SCR_WIDTH / 16};
-int constexpr GRID_HEIGHT {SCR_HEIGHT / 16};
+int constexpr GRID_WIDTH {SCR_WIDTH / 8};
+int constexpr GRID_HEIGHT {SCR_HEIGHT / 8};
 
 struct Cell
 {
@@ -14,6 +14,7 @@ struct Cell
     int type;
     int justMoved;
     int density;
+    int inertia;
 };
 
 void updateGridBuffers(GLuint& gridBuffer, GLuint& nextGridBuffer);
@@ -111,7 +112,7 @@ int main(int argc, char **argv)
     Shader automataShader("../assets/shaders/vertexShader.vert", "../assets/shaders/fragmentShader.frag");
     Shader automataCompute("../assets/shaders/computeShader.glsl");
 
-    GLuint gridBuffer, nextGridBuffer, claimBuffer;
+    GLuint gridBuffer, nextGridBuffer, claimBuffer, movedBuffer;
     glGenBuffers(1, &gridBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, gridBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, GRID_WIDTH * GRID_HEIGHT * sizeof(Cell), nullptr, GL_DYNAMIC_DRAW);
@@ -126,6 +127,10 @@ int main(int argc, char **argv)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, claimBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, GRID_WIDTH * GRID_HEIGHT * sizeof(int), nullptr, GL_DYNAMIC_DRAW);
 
+    glGenBuffers(1, &movedBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, movedBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, GRID_WIDTH * GRID_HEIGHT * sizeof(int), nullptr, GL_DYNAMIC_DRAW);
+
     for (int i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++)
     {
         data[i].type = 0;
@@ -135,6 +140,7 @@ int main(int argc, char **argv)
         data[i].colour[3] = 0.0f;
         data[i].justMoved = 0;
         data[i].density = 0;
+        data[i].inertia = 0;
     }
 
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
@@ -149,10 +155,11 @@ int main(int argc, char **argv)
 
     SDL_Event e;
 
-    const int targetFPS {60};
+    const int targetFPS {1000};
     const float frameDelay {1000 / targetFPS};
 
     int numPasses {5};
+    bool debugView {false};
 
     bool running {true};
     while (running)
@@ -176,6 +183,20 @@ int main(int argc, char **argv)
             {
                 running = false;
             }
+            else if (e.type == SDL_EVENT_KEY_DOWN)
+            {
+                if (e.key.key == SDLK_SPACE)
+                {
+                    debugView = true;
+                }
+            }
+            else if (e.type == SDL_EVENT_KEY_UP)
+            {
+                if (e.key.key == SDLK_SPACE)
+                {
+                    debugView = false;
+                }
+            }
         }
 
         automataCompute.use();
@@ -190,6 +211,7 @@ int main(int argc, char **argv)
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gridBuffer);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nextGridBuffer);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, claimBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, movedBuffer);
 
         /*
         passes:
@@ -218,6 +240,7 @@ int main(int argc, char **argv)
         automataShader.setInt("gridHeight", GRID_HEIGHT);
         automataShader.setInt("screenWidth", SCR_WIDTH);
         automataShader.setInt("screenHeight", SCR_HEIGHT);
+        automataShader.setBool("debug", debugView);
 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
