@@ -248,7 +248,7 @@ int main(int argc, char **argv)
 
         //framerate delay
         Uint32 frameTime = SDL_GetTicks() - frameStart;
-        std::cout << frameTime << std::endl;
+        //std::cout << frameTime << std::endl;
         if (frameDelay > frameTime)
         {
             SDL_Delay(frameDelay - frameTime);
